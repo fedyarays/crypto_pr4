@@ -1,0 +1,89 @@
+import math
+import warnings
+from PIL import Image
+import numpy as np
+import matplotlib.pyplot as plt
+warnings.filterwarnings('ignore')
+
+
+def l_u(d):
+    if 0 <= abs(d) <= 7:
+        l, u = 0, 7
+    elif 8 <= abs(d) <= 15:
+        l, u = 8, 15
+    elif 16 <= abs(d) <= 31:
+        l, u = 16, 31
+    elif 32 <= abs(d) <= 63:
+        l, u = 32, 63
+    elif 64 <= abs(d) <= 127:
+        l, u = 64, 127
+    else:
+        l, u = 128, 255
+    return l, u
+
+
+def MSE_func(first_picture, second_picture, M, N):
+    '''
+    :param first_picture: picture before steganography
+    :param second_picture: picture after steganography
+    :param M: height of picture
+    :param N: weight of picture
+    :return: MSE
+    '''
+    summ = 0
+    for i in range(M):
+        for j in range(N):
+            diffence = first_picture[i][j] - second_picture[i][j]
+            summ += diffence
+    MSE = summ / (M * N)
+    return MSE
+
+
+def arr_generator(pixes):
+    arr = []
+    for i in pixes:
+        arr.extend(i)
+    return np.array(arr)
+
+
+open_img = Image.open('64x64.png').convert('L')
+ciph_img = Image.open('stego.png')
+
+open_pix = np.asarray(open_img)
+ciph_pix = np.asarray(ciph_img)
+
+width, height = open_img.width, open_img.height
+
+MSE = round(MSE_func(open_pix, ciph_pix, height, width), 3)
+RMSE = round(math.sqrt(MSE), 3)
+PSNR = round(10 * math.log(((255 ** 2) / MSE), 10), 3)
+
+sigma_p = arr_generator(open_pix).std()
+sigma_s = arr_generator(ciph_pix).std()
+sigma_ps = np.cov(arr_generator(open_pix), arr_generator(ciph_pix))[0][1]
+
+nu_p = arr_generator(open_pix).mean()
+nu_s = arr_generator(ciph_pix).mean()
+# K1 = 0.01 , k2 = 0.03
+SSIM = ((2 * nu_s * nu_p + 0.01) * (2 * sigma_ps + 0.03)) / ((nu_p ** 2 + nu_s ** 2 + 0.01) * (sigma_s ** 2 + sigma_p ** 2 + 0.03))
+SSIM = round(SSIM, 3)
+
+q = 0
+for i in range(height):  # подсчитываем сколько битов может встроить в себя изображение
+    for j in range(0, width, 2):
+        d = open_pix[i][j] - open_pix[i][j + 1]
+        l, u = l_u(d)
+        n = int(math.log(u - l + 1, 2))
+        q += n
+EC = round(q / (height * width), 3)
+print('Максимальное количество символов, которые можно встроить:', round(q / 8))
+print(f'MSE -- {MSE}, RMSE -- {RMSE}, PSNR -- {PSNR}, SSIM -- {SSIM}, EC -- {EC}')
+
+
+
+plt.hist(open_pix)
+plt.title('Гистограмма исходного изображения')
+plt.show()
+#plt.hist(ciph_pix)
+#plt.title('Гистограмма изображения c встроенным сообщением')
+#plt.show()
